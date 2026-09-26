@@ -29,47 +29,43 @@
             <button class="btn-clear" onclick="clearAllOrders()">🗑️ Clear All Orders</button>
         </div>
 
-        <div id="ordersContainer"></div>
+        <div id="orderList"></div>
     </div>
 
 <script>
-    const BIN_ID = "6618c6e2acd3cb34a83533c0";
-    const API_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
-
-    async function loadLiveOrders() {
-        const container = document.getElementById('ordersContainer');
-        let orders = [];
-
-        try {
-            let res = await fetch(API_URL);
-            let json = await res.json();
-            if (json && json.record) {
-                orders = Array.isArray(json.record) ? json.record : (json.record.orders || []);
-            }
-        } catch (e) {
-            orders = JSON.parse(localStorage.getItem('localKitchenOrders') || '[]');
-        }
+    function loadOrders() {
+        const container = document.getElementById('orderList');
+        let orders = JSON.parse(localStorage.getItem('master_orders') || '[]');
 
         if (orders.length === 0) {
-            container.innerHTML = '<div class="empty-state">No incoming orders right now. Waiting for customer checkouts from mobile devices...</div>';
+            container.innerHTML = '<div class="empty-state">No incoming orders right now.</div>';
             return;
         }
 
         let html = '';
-        orders.forEach((order, index) => {
+        orders.forEach((o, index) => {
             let itemsHtml = '';
-            if (order.items) {
-                order.items.forEach(i => {
-                    itemsHtml += `<div class="item-row"><span>${i.name} (x${i.quantity})</span><span>₹${i.price * i.quantity}</span></div>`;
-                });
+            if (o.items) {
+                if (Array.isArray(o.items)) {
+                    o.items.forEach(i => {
+                        itemsHtml += `<div class="item-row"><span>${i.name} (x${i.quantity})</span><span>₹${i.price * i.quantity}</span></div>`;
+                    });
+                } else {
+                    for (let id in o.items) {
+                        let i = o.items[id];
+                        itemsHtml += `<div class="item-row"><span>${i.name} (x${i.quantity})</span><span>₹${i.price * i.quantity}</span></div>`;
+                    }
+                }
             }
+
+            let locationButton = o.location ? `<div style="margin-top: 12px;"><a href="${o.location}" target="_blank" class="location-btn">📍 Open Delivery Location Pin ↗</a></div>` : '';
 
             html += `
                 <div class="order-card">
                     <div class="order-header">
                         <div>
-                            <strong style="font-size: 16px; color: #1a202c;">Order #${order.serialNumber || (index + 1)}</strong>
-                            <div style="font-size: 12px; color: #718096; margin-top: 2px;">Customer ID: ${order.phone} | Time: ${order.timestamp}</div>
+                            <strong style="font-size: 16px; color: #1a202c;">Order: ${o.id || ('#' + (index + 1))}</strong>
+                            <div style="font-size: 12px; color: #718096; margin-top: 2px;">Customer: ${o.phone || 'Guest'} | Time: ${o.time || 'N/A'}</div>
                         </div>
                         <button style="background: #e53e3e; color: white; border: none; padding: 4px 8px; border-radius: 6px; font-size: 11px; cursor: pointer;" onclick="deleteSingleOrder(${index})">Remove</button>
                     </div>
@@ -77,11 +73,9 @@
                     <hr style="border:0; border-top:1px dashed #cbd5e0; margin:12px 0;">
                     <div style="display: flex; justify-content: space-between; font-weight: 600; font-size: 14px; color: #1a202c;">
                         <span>Grand Total (incl. delivery):</span>
-                        <span>₹${order.grandTotal}</span>
+                        <span>₹${o.grandTotal || o.itemTotal || 500}</span>
                     </div>
-                    <div style="margin-top: 12px;">
-                        <a href="${order.location}" target="_blank" class="location-btn">📍 Open Delivery Location Pin ↗</a>
-                    </div>
+                    ${locationButton}
                 </div>
             `;
         });
@@ -89,49 +83,28 @@
         container.innerHTML = html;
     }
 
-    async function deleteSingleOrder(index) {
+    function deleteSingleOrder(index) {
         if (!confirm('Are you sure you want to remove this order?')) return;
-        try {
-            let res = await fetch(API_URL);
-            let json = await res.json();
-            let orders = json && json.record ? (Array.isArray(json.record) ? json.record : (json.record.orders || [])) : [];
-            
-            orders.splice(index, 1);
-
-            await fetch(API_URL, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ orders: orders })
-            });
-            localStorage.setItem('localKitchenOrders', JSON.stringify(orders));
-            loadLiveOrders();
-        } catch (e) {
-            let orders = JSON.parse(localStorage.getItem('localKitchenOrders') || '[]');
-            orders.splice(index, 1);
-            localStorage.setItem('localKitchenOrders', JSON.stringify(orders));
-            loadLiveOrders();
-        }
+        let orders = JSON.parse(localStorage.getItem('master_orders') || '[]');
+        orders.splice(index, 1);
+        localStorage.setItem('master_orders', JSON.stringify(orders));
+        loadOrders();
     }
 
-    async function clearAllOrders() {
+    function clearAllOrders() {
         if (!confirm('Are you sure you want to clear all kitchen orders?')) return;
-        try {
-            await fetch(API_URL, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ orders: [] })
-            });
-            localStorage.removeItem('localKitchenOrders');
-            loadLiveOrders();
-        } catch (e) {
-            localStorage.removeItem('localKitchenOrders');
-            loadLiveOrders();
-        }
+        localStorage.removeItem('master_orders');
+        loadOrders();
     }
 
-    // Auto-refresh every 3 seconds to catch incoming orders from any device instantly
-    setInterval(loadLiveOrders, 3000);
-    loadLiveOrders();
+    window.addEventListener('storage', (e) => {
+        if (e.key === 'master_orders' || e.key === 'force_sync') {
+            loadOrders();
+        }
+    });
+
+    setInterval(loadOrders, 1500);
+    loadOrders();
 </script>
 </body>
 </html>
