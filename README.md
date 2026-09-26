@@ -10,10 +10,10 @@
         .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         h2 { margin: 0; color: #1a202c; font-size: 22px; }
         
-  .btn-clear { background: #e53e3e; color: white; border: none; padding: 8px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 13px; transition: background 0.2s; }
+   .btn-clear { background: #e53e3e; color: white; border: none; padding: 8px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 13px; transition: background 0.2s; }
         .btn-clear:hover { background: #c53030; }
 
-  .order-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); border: 1px solid #edf2f7; margin-bottom: 16px; }
+   .order-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); border: 1px solid #edf2f7; margin-bottom: 16px; }
         .order-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #edf2f7; padding-bottom: 10px; margin-bottom: 12px; }
         .item-row { display: flex; justify-content: space-between; font-size: 14px; margin: 6px 0; color: #4a5568; }
         .location-btn { display: inline-block; background: #3182ce; color: white; padding: 8px 14px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600; margin-top: 10px; }
@@ -25,7 +25,7 @@
 
  <div class="container">
         <div class="header-row">
-            <h2>🍳 Live Kitchen Orders (Firebase Cloud)</h2>
+            <h2>🍳 Live Kitchen Orders</h2>
             <button class="btn-clear" onclick="clearAllOrders()">🗑️ Clear All Orders</button>
         </div>
 
@@ -33,8 +33,7 @@
     </div>
 
 <script>
-    // Your Firebase Database URL
-    const FIREBASE_URL = "https://test-d34cf-default-rtdb.firebaseio.com";
+    const FIREBASE_URL = "https://test-d34cf-default-rtdb.europe-west1.firebasedatabase.app";
 
     async function loadOrders() {
         const container = document.getElementById('orderList');
@@ -50,7 +49,7 @@
         }
 
         if (orders.length === 0) {
-            container.innerHTML = '<div class="empty-state">No incoming orders right now. Waiting for customer checkouts from mobile devices...</div>';
+            container.innerHTML = '<div class="empty-state">No incoming orders right now. Waiting for customer checkouts...</div>';
             return;
         }
 
@@ -121,7 +120,7 @@
         }
     }
 
-    // Auto-refresh every 2 seconds to instantly pop up new orders from any device
+    // Auto-refresh every 2 seconds to instantly pull live updates from any device
     setInterval(loadOrders, 2000);
     loadOrders();
 </script>
