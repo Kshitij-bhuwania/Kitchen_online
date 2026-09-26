@@ -10,8 +10,9 @@
         .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         h2 { margin: 0; color: #1a202c; font-size: 22px; }
         
-  .btn-clear { background: #e53e3e; color: white; border: none; padding: 8px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 13px; transition: background 0.2s; }
+   .btn-clear { background: #e53e3e; color: white; border: none; padding: 8px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 13px; transition: background 0.2s; }
         .btn-clear:hover { background: #c53030; }
+
    .order-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); border: 1px solid #edf2f7; margin-bottom: 16px; }
         .order-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #edf2f7; padding-bottom: 10px; margin-bottom: 12px; }
         .item-row { display: flex; justify-content: space-between; font-size: 14px; margin: 6px 0; color: #4a5568; }
@@ -22,35 +23,34 @@
 </head>
 <body>
 
- <div class="container">
+  <div class="container">
         <div class="header-row">
-            <h2>🍳 Live Kitchen Orders (Multi-Device)</h2>
+            <h2>🍳 Live Kitchen Orders</h2>
             <button class="btn-clear" onclick="clearAllOrders()">🗑️ Clear All Orders</button>
         </div>
 
-   <div id="ordersContainer"></div>
+  <div id="ordersContainer"></div>
     </div>
 
 <script>
-    const SYNC_URL = "https://api.npoint.io/7581c3e382d61d1e1147";
+    const BIN_URL = "https://api.jsonbin.io/v3/b/6618c6e2acd3cb34a83533c0";
 
     async function loadLiveOrders() {
         const container = document.getElementById('ordersContainer');
         let orders = [];
 
         try {
-            let response = await fetch(SYNC_URL);
-            if (response.ok) {
-                let data = await response.json();
-                if (Array.isArray(data)) orders = data;
+            let res = await fetch(BIN_URL);
+            let json = await res.json();
+            if (json && json.record) {
+                orders = Array.isArray(json.record) ? json.record : (json.record.orders || []);
             }
-        } catch (error) {
-            container.innerHTML = '<div class="empty-state">Network connection error loading orders.</div>';
-            return;
+        } catch (e) {
+            orders = JSON.parse(localStorage.getItem('localKitchenOrders') || '[]');
         }
 
         if (orders.length === 0) {
-            container.innerHTML = '<div class="empty-state">No incoming orders right now. Place an order from another mobile phone to test!</div>';
+            container.innerHTML = '<div class="empty-state">No incoming orders right now. Try placing an order from your phone!</div>';
             return;
         }
 
@@ -68,7 +68,7 @@
                     <div class="order-header">
                         <div>
                             <strong style="font-size: 16px; color: #1a202c;">Order #${order.serialNumber || (index + 1)}</strong>
-                            <div style="font-size: 12px; color: #718096; margin-top: 2px;">Customer ID: ${order.phone} | Time: ${order.timestamp}</div>
+                            <div style="font-size: 12px; color: #718096; margin-top: 2px;">Customer: ${order.phone} | Time: ${order.timestamp}</div>
                         </div>
                         <button style="background: #e53e3e; color: white; border: none; padding: 4px 8px; border-radius: 6px; font-size: 11px; cursor: pointer;" onclick="deleteSingleOrder(${index})">Remove</button>
                     </div>
@@ -89,39 +89,46 @@
     }
 
     async function deleteSingleOrder(index) {
-        if (!confirm('Are you sure you want to remove this order?')) return;
+        if (!confirm('Remove this order?')) return;
         try {
-            let response = await fetch(SYNC_URL);
-            let orders = response.ok ? await response.json() : [];
-            if (Array.isArray(orders)) {
-                orders.splice(index, 1);
-                await fetch(SYNC_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(orders)
-                });
-            }
+            let res = await fetch(BIN_URL);
+            let json = await res.json();
+            let orders = json && json.record ? (Array.isArray(json.record) ? json.record : (json.record.orders || [])) : [];
+            
+            orders.splice(index, 1);
+
+            await fetch(BIN_URL, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ orders: orders })
+            });
+            localStorage.setItem('localKitchenOrders', JSON.stringify(orders));
             loadLiveOrders();
-        } catch (error) {
-            alert('Failed to delete order.');
+        } catch (e) {
+            let orders = JSON.parse(localStorage.getItem('localKitchenOrders') || '[]');
+            orders.splice(index, 1);
+            localStorage.setItem('localKitchenOrders', JSON.stringify(orders));
+            loadLiveOrders();
         }
     }
 
     async function clearAllOrders() {
-        if (!confirm('Are you sure you want to clear all kitchen orders?')) return;
+        if (!confirm('Clear all orders?')) return;
         try {
-            await fetch(SYNC_URL, {
-                method: 'POST',
+            await fetch(BIN_URL, {
+                method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify([])
+                body: JSON.stringify({ orders: [] })
             });
+            localStorage.removeItem('localKitchenOrders');
             loadLiveOrders();
-        } catch (error) {
-            alert('Failed to clear orders.');
+        } catch (e) {
+            localStorage.removeItem('localKitchenOrders');
+            loadLiveOrders();
         }
     }
 
-    // Auto-poll every 3 seconds so orders placed from any other mobile/user ID pop up instantly
+    // Auto-refresh every 3 seconds to pull live updates from any mobile device
     setInterval(loadLiveOrders, 3000);
     loadLiveOrders();
 </script>
