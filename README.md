@@ -10,10 +10,10 @@
         .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         h2 { margin: 0; color: #1a202c; font-size: 22px; }
         
-   .btn-clear { background: #e53e3e; color: white; border: none; padding: 8px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 13px; transition: background 0.2s; }
+        .btn-clear { background: #e53e3e; color: white; border: none; padding: 8px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 13px; transition: background 0.2s; }
         .btn-clear:hover { background: #c53030; }
 
-   .order-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); border: 1px solid #edf2f7; margin-bottom: 16px; }
+        .order-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); border: 1px solid #edf2f7; margin-bottom: 16px; }
         .order-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #edf2f7; padding-bottom: 10px; margin-bottom: 12px; }
         .item-row { display: flex; justify-content: space-between; font-size: 14px; margin: 6px 0; color: #4a5568; }
         .location-btn { display: inline-block; background: #3182ce; color: white; padding: 8px 14px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600; margin-top: 10px; }
@@ -23,24 +23,25 @@
 </head>
 <body>
 
-  <div class="container">
+    <div class="container">
         <div class="header-row">
             <h2>🍳 Live Kitchen Orders</h2>
             <button class="btn-clear" onclick="clearAllOrders()">🗑️ Clear All Orders</button>
         </div>
 
-  <div id="ordersContainer"></div>
+        <div id="ordersContainer"></div>
     </div>
 
 <script>
-    const BIN_URL = "https://api.jsonbin.io/v3/b/6618c6e2acd3cb34a83533c0";
+    const BIN_ID = "6618c6e2acd3cb34a83533c0";
+    const API_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 
     async function loadLiveOrders() {
         const container = document.getElementById('ordersContainer');
         let orders = [];
 
         try {
-            let res = await fetch(BIN_URL);
+            let res = await fetch(API_URL);
             let json = await res.json();
             if (json && json.record) {
                 orders = Array.isArray(json.record) ? json.record : (json.record.orders || []);
@@ -50,7 +51,7 @@
         }
 
         if (orders.length === 0) {
-            container.innerHTML = '<div class="empty-state">No incoming orders right now. Try placing an order from your phone!</div>';
+            container.innerHTML = '<div class="empty-state">No incoming orders right now. Waiting for customer checkouts from mobile devices...</div>';
             return;
         }
 
@@ -68,7 +69,7 @@
                     <div class="order-header">
                         <div>
                             <strong style="font-size: 16px; color: #1a202c;">Order #${order.serialNumber || (index + 1)}</strong>
-                            <div style="font-size: 12px; color: #718096; margin-top: 2px;">Customer: ${order.phone} | Time: ${order.timestamp}</div>
+                            <div style="font-size: 12px; color: #718096; margin-top: 2px;">Customer ID: ${order.phone} | Time: ${order.timestamp}</div>
                         </div>
                         <button style="background: #e53e3e; color: white; border: none; padding: 4px 8px; border-radius: 6px; font-size: 11px; cursor: pointer;" onclick="deleteSingleOrder(${index})">Remove</button>
                     </div>
@@ -89,15 +90,15 @@
     }
 
     async function deleteSingleOrder(index) {
-        if (!confirm('Remove this order?')) return;
+        if (!confirm('Are you sure you want to remove this order?')) return;
         try {
-            let res = await fetch(BIN_URL);
+            let res = await fetch(API_URL);
             let json = await res.json();
             let orders = json && json.record ? (Array.isArray(json.record) ? json.record : (json.record.orders || [])) : [];
             
             orders.splice(index, 1);
 
-            await fetch(BIN_URL, {
+            await fetch(API_URL, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ orders: orders })
@@ -113,9 +114,9 @@
     }
 
     async function clearAllOrders() {
-        if (!confirm('Clear all orders?')) return;
+        if (!confirm('Are you sure you want to clear all kitchen orders?')) return;
         try {
-            await fetch(BIN_URL, {
+            await fetch(API_URL, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ orders: [] })
@@ -128,7 +129,7 @@
         }
     }
 
-    // Auto-refresh every 3 seconds to pull live updates from any mobile device
+    // Auto-refresh every 3 seconds to catch incoming orders from any device instantly
     setInterval(loadLiveOrders, 3000);
     loadLiveOrders();
 </script>
