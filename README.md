@@ -10,10 +10,10 @@
         .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         h2 { margin: 0; color: #1a202c; font-size: 22px; }
         
-  .btn-clear { background: #e53e3e; color: white; border: none; padding: 8px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 13px; transition: background 0.2s; }
+   .btn-clear { background: #e53e3e; color: white; border: none; padding: 8px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 13px; transition: background 0.2s; }
         .btn-clear:hover { background: #c53030; }
 
-  .order-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); border: 1px solid #edf2f7; margin-bottom: 16px; }
+   .order-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); border: 1px solid #edf2f7; margin-bottom: 16px; }
         .order-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #edf2f7; padding-bottom: 10px; margin-bottom: 12px; }
         .item-row { display: flex; justify-content: space-between; font-size: 14px; margin: 6px 0; color: #4a5568; }
         .location-btn { display: inline-block; background: #3182ce; color: white; padding: 8px 14px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600; margin-top: 10px; }
@@ -22,8 +22,9 @@
     </style>
 </head>
 <body>
-    <div class="container">
-      <div class="header-row">
+
+ <div class="container">
+        <div class="header-row">
             <h2>🍳 Live Kitchen Orders</h2>
             <button class="btn-clear" onclick="clearAllOrders()">🗑️ Clear All Orders</button>
         </div>
@@ -32,9 +33,21 @@
     </div>
 
 <script>
-    function loadLiveOrders() {
+    const SYNC_URL = "https://jsonbin.org/kshitij_restaurant_live_orders_sync/orders";
+
+    async function loadLiveOrders() {
         const container = document.getElementById('ordersContainer');
-        const orders = JSON.parse(localStorage.getItem('liveOrders') || '[]');
+        let orders = [];
+
+        try {
+            let response = await fetch(SYNC_URL);
+            if (response.ok) {
+                let data = await response.json();
+                if (Array.isArray(data)) orders = data;
+            }
+        } catch (error) {
+            orders = JSON.parse(localStorage.getItem('liveOrders') || '[]');
+        }
 
         if (orders.length === 0) {
             container.innerHTML = '<div class="empty-state">No incoming orders right now.</div>';
@@ -44,15 +57,17 @@
         let html = '';
         orders.forEach((order, index) => {
             let itemsHtml = '';
-            order.items.forEach(i => {
-                itemsHtml += `<div class="item-row"><span>${i.name} (x${i.quantity})</span><span>₹${i.price * i.quantity}</span></div>`;
-            });
+            if (order.items) {
+                order.items.forEach(i => {
+                    itemsHtml += `<div class="item-row"><span>${i.name} (x${i.quantity})</span><span>₹${i.price * i.quantity}</span></div>`;
+                });
+            }
 
             html += `
                 <div class="order-card">
                     <div class="order-header">
                         <div>
-                            <strong style="font-size: 16px; color: #1a202c;">Order #${order.serialNumber}</strong>
+                            <strong style="font-size: 16px; color: #1a202c;">Order #${order.serialNumber || (index + 1)}</strong>
                             <div style="font-size: 12px; color: #718096; margin-top: 2px;">Customer Phone: ${order.phone} | Time: ${order.timestamp}</div>
                         </div>
                         <button style="background: #e53e3e; color: white; border: none; padding: 4px 8px; border-radius: 6px; font-size: 11px; cursor: pointer;" onclick="deleteSingleOrder(${index})">Remove</button>
@@ -73,22 +88,45 @@
         container.innerHTML = html;
     }
 
-    function deleteSingleOrder(index) {
+    async function deleteSingleOrder(index) {
         if (!confirm('Are you sure you want to remove this order?')) return;
-        let orders = JSON.parse(localStorage.getItem('liveOrders') || '[]');
-        orders.splice(index, 1);
-        localStorage.setItem('liveOrders', JSON.stringify(orders));
-        loadLiveOrders();
+        try {
+            let response = await fetch(SYNC_URL);
+            let orders = response.ok ? await response.json() : [];
+            if (Array.isArray(orders)) {
+                orders.splice(index, 1);
+                await fetch(SYNC_URL, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(orders)
+                });
+            }
+            loadLiveOrders();
+        } catch (error) {
+            let localOrders = JSON.parse(localStorage.getItem('liveOrders') || '[]');
+            localOrders.splice(index, 1);
+            localStorage.setItem('liveOrders', JSON.stringify(localOrders));
+            loadLiveOrders();
+        }
     }
 
-    function clearAllOrders() {
+    async function clearAllOrders() {
         if (!confirm('Are you sure you want to clear all kitchen orders?')) return;
-        localStorage.removeItem('liveOrders');
-        loadLiveOrders();
+        try {
+            await fetch(SYNC_URL, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify([])
+            });
+            loadLiveOrders();
+        } catch (error) {
+            localStorage.removeItem('liveOrders');
+            loadLiveOrders();
+        }
     }
 
-    // Auto-refresh orders every 5 seconds so kitchen sees new checkouts live
-    setInterval(loadLiveOrders, 5000);
+    // Auto-refresh every 3 seconds to catch external device checkouts instantly
+    setInterval(loadLiveOrders, 3000);
     loadLiveOrders();
 </script>
 </body>
