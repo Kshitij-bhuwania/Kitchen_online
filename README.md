@@ -2,69 +2,94 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kitchen Live Orders</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #edf2f7; padding: 30px; }
-        .container { max-width: 800px; margin: 0 auto; }
-        .order-card { background: white; border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); border-left: 6px solid #2ed573; }
-        .order-header { display: flex; justify-content: space-between; font-weight: bold; font-size: 16px; margin-bottom: 10px; color: #333; }
-        .order-details { margin: 10px 0; color: #555; font-size: 14px; }
-        ul { padding-left: 20px; margin: 5px 0; }
-        .summary-row { display: flex; justify-content: space-between; border-top: 1px solid #eee; margin-top: 15px; padding-top: 10px; font-weight: bold; }
-        .map-link { color: #1e90ff; font-weight: bold; text-decoration: underline; }
-        .back-btn { background: #333; color: white; padding: 10px 15px; border: none; border-radius: 6px; cursor: pointer; margin-bottom: 20px; }
+        body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #f4f6f9; padding: 20px; color: #2d3748; display: flex; justify-content: center; margin: 0; }
+        .container { width: 100%; max-width: 700px; }
+        .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        h2 { margin: 0; color: #1a202c; font-size: 22px; }
+        
+  .btn-clear { background: #e53e3e; color: white; border: none; padding: 8px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 13px; transition: background 0.2s; }
+        .btn-clear:hover { background: #c53030; }
+
+  .order-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); border: 1px solid #edf2f7; margin-bottom: 16px; }
+        .order-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #edf2f7; padding-bottom: 10px; margin-bottom: 12px; }
+        .item-row { display: flex; justify-content: space-between; font-size: 14px; margin: 6px 0; color: #4a5568; }
+        .location-btn { display: inline-block; background: #3182ce; color: white; padding: 8px 14px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600; margin-top: 10px; }
+        .location-btn:hover { background: #2b6cb0; }
+        .empty-state { text-align: center; color: #718096; padding: 40px; font-size: 15px; background: white; border-radius: 12px; border: 1px solid #edf2f7; }
     </style>
 </head>
 <body>
-
     <div class="container">
-        <button class="back-btn" onclick="window.location.href='menu.html'">← Back to Menu</button>
-        <h1>Kitchen Live Orders Feed</h1>
-        <div id="ordersContainer"></div>
+      <div class="header-row">
+            <h2>🍳 Live Kitchen Orders</h2>
+            <button class="btn-clear" onclick="clearAllOrders()">🗑️ Clear All Orders</button>
+        </div>
+
+   <div id="ordersContainer"></div>
     </div>
 
 <script>
-    function renderOrders() {
-        const orders = JSON.parse(localStorage.getItem('liveOrders') || '[]');
+    function loadLiveOrders() {
         const container = document.getElementById('ordersContainer');
-        container.innerHTML = '';
+        const orders = JSON.parse(localStorage.getItem('liveOrders') || '[]');
 
         if (orders.length === 0) {
-            container.innerHTML = '<p style="color: #666;">No orders checked out yet.</p>';
+            container.innerHTML = '<div class="empty-state">No incoming orders right now.</div>';
             return;
         }
 
-        orders.forEach(order => {
-            let itemsHtml = order.items.map(i => `<li>${i.name} (x${i.quantity}) — ₹${i.price * i.quantity}</li>`).join('');
+        let html = '';
+        orders.forEach((order, index) => {
+            let itemsHtml = '';
+            order.items.forEach(i => {
+                itemsHtml += `<div class="item-row"><span>${i.name} (x${i.quantity})</span><span>₹${i.price * i.quantity}</span></div>`;
+            });
 
-            // Check if location is a link or standard text
-            let locationDisplay = order.location.startsWith('http') 
-                ? `<a href="${order.location}" target="_blank" class="map-link">Open Google Maps Pin ↗</a>` 
-                : order.location;
-
-            container.innerHTML += `
+            html += `
                 <div class="order-card">
                     <div class="order-header">
-                        <span>#️⃣ Order Serial No: #${order.serialNumber}</span>
-                        <span>📱 Phone: ${order.phone}</span>
+                        <div>
+                            <strong style="font-size: 16px; color: #1a202c;">Order #${order.serialNumber}</strong>
+                            <div style="font-size: 12px; color: #718096; margin-top: 2px;">Customer Phone: ${order.phone} | Time: ${order.timestamp}</div>
+                        </div>
+                        <button style="background: #e53e3e; color: white; border: none; padding: 4px 8px; border-radius: 6px; font-size: 11px; cursor: pointer;" onclick="deleteSingleOrder(${index})">Remove</button>
                     </div>
-                    <div class="order-details">
-                        <p><strong>Location:</strong> ${locationDisplay}</p>
-                        <p><strong>Items:</strong></p>
-                        <ul>${itemsHtml}</ul>
+                    <div>${itemsHtml}</div>
+                    <hr style="border:0; border-top:1px dashed #cbd5e0; margin:12px 0;">
+                    <div style="display: flex; justify-content: space-between; font-weight: 600; font-size: 14px; color: #1a202c;">
+                        <span>Grand Total (incl. delivery):</span>
+                        <span>₹${order.grandTotal}</span>
                     </div>
-                    <div class="summary-row">
-                        <span>Total Items Count: ${order.totalItemsCount}</span>
-                        <span>Grand Value: ₹${order.grandTotal} (Inc. ₹${order.deliveryCharge} delivery)</span>
+                    <div style="margin-top: 12px;">
+                        <a href="${order.location}" target="_blank" class="location-btn">📍 Open Delivery Location Pin ↗</a>
                     </div>
-                    <div style="font-size: 11px; color: #999; margin-top: 8px; text-align: right;">Time: ${order.timestamp}</div>
                 </div>
             `;
         });
+
+        container.innerHTML = html;
     }
 
-    renderOrders();
-    setInterval(renderOrders, 2000); // Live sync polling
+    function deleteSingleOrder(index) {
+        if (!confirm('Are you sure you want to remove this order?')) return;
+        let orders = JSON.parse(localStorage.getItem('liveOrders') || '[]');
+        orders.splice(index, 1);
+        localStorage.setItem('liveOrders', JSON.stringify(orders));
+        loadLiveOrders();
+    }
+
+    function clearAllOrders() {
+        if (!confirm('Are you sure you want to clear all kitchen orders?')) return;
+        localStorage.removeItem('liveOrders');
+        loadLiveOrders();
+    }
+
+    // Auto-refresh orders every 5 seconds so kitchen sees new checkouts live
+    setInterval(loadLiveOrders, 5000);
+    loadLiveOrders();
 </script>
 </body>
 </html>
