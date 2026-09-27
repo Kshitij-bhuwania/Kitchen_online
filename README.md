@@ -10,13 +10,13 @@
         .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         h2 { margin: 0; color: #1a202c; font-size: 22px; }
         
-   .btn-clear { background: #e53e3e; color: white; border: none; padding: 8px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 13px; transition: background 0.2s; }
+        .btn-clear { background: #e53e3e; color: white; border: none; padding: 8px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 13px; transition: background 0.2s; }
         .btn-clear:hover { background: #c53030; }
 
-  .order-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); border: 1px solid #edf2f7; margin-bottom: 16px; animation: fadeIn 0.3s ease; }
+        .order-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); border: 1px solid #edf2f7; margin-bottom: 16px; animation: fadeIn 0.3s ease; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
         
-  .order-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #edf2f7; padding-bottom: 10px; margin-bottom: 12px; }
+        .order-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #edf2f7; padding-bottom: 10px; margin-bottom: 12px; }
         .item-row { display: flex; justify-content: space-between; font-size: 14px; margin: 6px 0; color: #4a5568; }
         .location-btn { display: inline-block; background: #3182ce; color: white; padding: 8px 14px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600; margin-top: 10px; }
         .location-btn:hover { background: #2b6cb0; }
@@ -25,60 +25,41 @@
 </head>
 <body>
 
-  <div class="container">
+    <div class="container">
         <div class="header-row">
             <h2>🍳 Live Kitchen Orders</h2>
             <button class="btn-clear" onclick="clearAllOrders()">🗑️ Clear All Orders</button>
         </div>
 
-   <div id="orderList"></div>
+        <div id="orderList"></div>
     </div>
 
 <script>
     const FIREBASE_URL = "https://test-d34cf-default-rtdb.europe-west1.firebasedatabase.app";
     let lastOrderCount = null;
-    let alarmIntervalId = null;
 
-    // Built-in audio alarm using Web Audio API
-    function playSingleBeep() {
+    // Continuous 5-second alarm tone using Web Audio API
+    function playAlarm() {
         try {
             const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            let osc = audioCtx.createOscillator();
+            let gain = audioCtx.createGain();
             
-            [0, 0.25].forEach(delay => {
-                let osc = audioCtx.createOscillator();
-                let gain = audioCtx.createGain();
-                
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(880, audioCtx.currentTime + delay);
-                
-                gain.gain.setValueAtTime(0.4, audioCtx.currentTime + delay);
-                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + delay + 0.15);
-                
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                
-                osc.start(audioCtx.currentTime + delay);
-                osc.stop(audioCtx.currentTime + delay + 0.15);
-            });
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime); // Pitch
+            
+            // Hold continuous sound for 4.8 seconds, then fade out smoothly over 0.2 seconds (total 5 seconds)
+            gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.4, audioCtx.currentTime + 4.8);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 5.0);
+            
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            osc.start(audioCtx.currentTime);
+            osc.stop(audioCtx.currentTime + 5.0);
         } catch (e) {
             console.log("Audio playback blocked until user interacts with the page.");
-        }
-    }
-
-    // Start repeating alarm every 5 seconds until acknowledged/cleared
-    function startRepeatingAlarm() {
-        if (alarmIntervalId) return; // Don't start multiple intervals
-        playSingleBeep(); // Play immediately on new order
-        alarmIntervalId = setInterval(() => {
-            playSingleBeep();
-        }, 5000); // 5-second interval between each sound loop
-    }
-
-    // Stop repeating alarm when orders are managed or cleared
-    function stopRepeatingAlarm() {
-        if (alarmIntervalId) {
-            clearInterval(alarmIntervalId);
-            alarmIntervalId = null;
         }
     }
 
@@ -97,11 +78,8 @@
 
         // Check if a brand new order has arrived
         if (lastOrderCount !== null && orders.length > lastOrderCount) {
-            startRepeatingAlarm();
-        } else if (orders.length === 0) {
-            stopRepeatingAlarm();
+            playAlarm();
         }
-        
         lastOrderCount = orders.length;
 
         if (orders.length === 0) {
@@ -146,7 +124,6 @@
     async function deleteSingleOrder(index) {
         if (!confirm('Are you sure you want to remove this order?')) return;
         try {
-            stopRepeatingAlarm(); // Stop alarm when handling orders
             let res = await fetch(`${FIREBASE_URL}/orders.json`);
             let orders = await res.json();
             if (Array.isArray(orders)) {
@@ -167,7 +144,6 @@
     async function clearAllOrders() {
         if (!confirm('Are you sure you want to clear all kitchen orders?')) return;
         try {
-            stopRepeatingAlarm(); // Stop alarm when clearing orders
             lastOrderCount = 0;
             await fetch(`${FIREBASE_URL}/orders.json`, {
                 method: 'PUT',
@@ -180,8 +156,8 @@
         }
     }
 
-    // Auto-refresh the order check every 5 seconds
-    setInterval(loadOrders, 5000);
+    // Auto-refresh every 2 seconds to check for new orders globally
+    setInterval(loadOrders, 2000);
     loadOrders();
 </script>
 </body>
